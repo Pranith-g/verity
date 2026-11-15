@@ -8,8 +8,8 @@ It has two parts:
 
 - **API** (`backend/`, Python + FastAPI): studies with an ask/tell loop, a stop rule, and a
   three-way benchmark.
-- **Web app** (`frontend/`, React + TypeScript): a live benchmark page and a workbench for your
-  own studies.
+- **Web app** (`frontend/`, React + TypeScript): a live benchmark page, a workbench for your
+  own studies, and three real-world applications (air quality, traffic flow, weather).
 
 ## How it works
 
@@ -84,6 +84,12 @@ getting the same point. You can also report points you chose yourself with `x1`,
 | `DELETE /api/studies/{id}` | Delete a study and its runs |
 | `POST /api/races`, `GET /api/races/{id}/events` | Start a benchmark; follow it as server-sent events |
 | `GET /api/benchmarks/init-design` | Saved comparison of random vs maximin-LHS opening runs |
+| `GET /api/apps`, `GET /api/apps/{key}` | Applications: status, accuracy, forecast surface, readings |
+| `GET /api/apps/{key}/model` | The application's own reference function, and why no benchmark function is used |
+| `POST /api/apps/{key}/predict` | Forecast for one pair of inputs, with a 95% range and its category |
+| `POST /api/apps/{key}/readings` | Add field readings; the model retrains and returns before/after |
+| `POST /api/apps/{key}/readings/sample` | Simulated sensors: noisy readings at random points, then retrain |
+| `POST /api/apps/{key}/train` | Learn the application's surrogate again from scratch |
 | `GET /api/health` | Liveness check (always open) |
 
 ## Settings
@@ -101,7 +107,7 @@ Environment variables, or `backend/.env` (see `.env.example`).
 ## Checks
 
 ```bash
-cd backend  && ruff check . && pytest -q          # 33 tests
+cd backend  && ruff check . && pytest -q          # 41 tests
 cd frontend && npm run typecheck && npm test && npm run build
 python -m scripts.measure                         # from backend/: re-measure the table below
 python -m scripts.compare_init                    # from backend/: random vs LHS opening runs, for the web app
@@ -156,6 +162,40 @@ provided under COPERNICUS by the European Union and ESA; all rights reserved. It
 surface model, so it reads low on very steep spires (the Matterhorn summit comes out near
 4330 m, not 4478 m).
 
+## Real-world applications
+
+The web app's **Applications** page (`/apps`) puts the method to work on three city-scale forecasting
+problems, each a function of two inputs:
+
+| Application | Inputs → output | Reference model it stands in for | Categories |
+|---|---|---|---|
+| Air quality | hour of day, wind speed → PM2.5 (µg/m³) | dispersion model | India NAQI PM2.5 bands |
+| Traffic flow | hour of day, day of week → congestion (% extra travel time) | traffic assignment model | free flow to gridlock |
+| Weather | day of year, hour of day → temperature (°C) | numerical weather model | cold to extreme heat |
+
+For each one, the Verify learner buys reference-model runs until its stop rule passes (or the budget
+runs out), and the fitted surrogate answers forecasts in tens of microseconds. Measured on start-up:
+air quality certified at 222 runs (R² 99.0%), weather at 210 runs (R² 99.9%); traffic used its full
+340-run budget without the stop rule passing (R² 99.0%), and the page says so.
+
+**New data retrains the model.** Field readings are stored in the database (`app_observations`) and
+blended into the surrogate at once: a *sensor* reading is treated as noisy, so the surface leans
+towards it; a *verified* reading is matched exactly. The reply shows the forecast before and after,
+whether the reading was a surprise (off by more than the learner's allowed miss, widened by sensor
+noise for sensor readings), the change in accuracy, and where the learner would measure next. The page
+also accepts pasted CSV and has a live simulated-sensor feed.
+
+**Which function each application uses.** None of the benchmark functions. Rastrigin, Peaks and the
+rest are abstract test landscapes without units, there to test the learner. Each application has its
+own function (written out term by term in its **Model function** panel), and the panel explains, for
+each of the seven benchmarks, why it does not fit. It also measures which benchmark is closest in
+shape (by the number of peaks and valleys deeper than 5% of the range): Peaks, for all three.
+
+The reference models are physically shaped closed forms calibrated to realistic magnitudes, **not
+measurements**. Accuracy on the page is measured against them, so readings that disagree with the
+reference model (a local event, a faulty sensor) lower it. Reference runs live in the API process's
+memory and are retrained, deterministically, after a restart; the readings persist.
+
 ## Limits you should know about
 
 - **The stop rule is a heuristic, not a proof.** 41 out of 41 on seven test functions is evidence,
@@ -181,12 +221,14 @@ surface model, so it reads low on very steep spires (the Matterhorn summit comes
 ```
 backend/app/core/      numerical core: surrogate, features, learner, referee, race (no web, no DB)
 backend/app/core/real_data.py  real-data simulators, kept apart from the test functions
+backend/app/core/applications.py  the three applications' reference models, inputs and categories
+backend/app/services/applications.py  train, predict, and retrain on new readings
 backend/app/data/real/ the measured grids (.npz) those simulators read
 backend/app/services/  study logic, background races, demo auto-run
 backend/app/api/       HTTP routes
 backend/tests/         pytest suite
 backend/scripts/       measure.py: the tables above; fetch_dem.py: crop an elevation tile
-frontend/src/pages/    Benchmark, Studies, Study workbench
+frontend/src/pages/    Benchmark, Studies, Study workbench, Applications
 frontend/src/components/  field map, charts, stop-rule list
 examples/client.py     ask/tell loop with the standard library
 ```

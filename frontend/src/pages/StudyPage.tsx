@@ -274,7 +274,7 @@ while True:
               <Tile icon={<ActivityIcon size={18} />} label="Runs reported" accent="#00d4ff" progress={study.runs_done / Math.max(1, study.max_runs)} unit={`/ ${study.max_runs}`}>
                 <Num value={study.runs_done} />
               </Tile>
-              <Tile icon={<TargetIcon size={18} />} label="Deep features checked" tone={stop?.features_checked ? 'good' : undefined} unit={`/ ${deep.length}`}>
+              <Tile icon={<TargetIcon size={18} />} label="Features checked" tone={stop?.features_checked ? 'good' : undefined} unit={`/ ${deep.length}`}>
                 <Num value={deepChecked} />
               </Tile>
               <Tile icon={<WaveIcon size={18} />} label="Worst recent miss" tone={stop?.surprises_small ? 'good' : undefined} sub={stop ? `allowed ${num(stop.allowed_miss)}` : 'after the first fit'}>

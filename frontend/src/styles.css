@@ -1554,9 +1554,13 @@ legend {
   flex: 1;
 }
 .tile-body .overline {
-  white-space: nowrap;
+  /* wrap rather than cut "Deep features checked" down to "Deep featur…" */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .tile-v {
   display: flex;

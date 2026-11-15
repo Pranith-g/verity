@@ -333,9 +333,15 @@ export const Surface3D = forwardRef<Surface3DHandle, Props>(function Surface3D(
     });
     const pts = new THREE.Points(pg, pm);
     pts.frustumCulled = false;
+    // Transparent objects are sorted far-to-near by bounding-sphere centre. The runs and the
+    // surface both sit near the origin, so without this the order flips with the view angle
+    // and the 96%-opaque surface can paint over every run. Always draw them after it; the
+    // surface still writes depth, so a run behind a hill stays hidden.
+    pts.renderOrder = 1;
     scene.add(pts);
 
     const beaconGroup = new THREE.Group();
+    beaconGroup.renderOrder = 1; // same reason, for the feature pillars and rings
     scene.add(beaconGroup);
 
     /* post: bloom */

@@ -210,3 +210,234 @@ class OverviewOut(BaseModel):
     autoruns_active: int
     activity: list[int]  # runs reported per bucket, oldest first
     activity_bucket_min: int
+
+
+# ---------------------------------------------------------------- real-world applications
+class AppInputOut(BaseModel):
+    key: str
+    label: str
+    unit: str
+    low: float
+    high: float
+    step: float
+    fmt: str
+
+
+class AppBandOut(BaseModel):
+    upto: float | None  # None for the open-ended top band
+    label: str
+    color: str
+    advice: str
+
+
+class AppExampleOut(BaseModel):
+    label: str
+    x1: float
+    x2: float
+
+
+class AppMetricsOut(BaseModel):
+    rmse: float | None  # against the reference model on the 49 x 49 grid, output units
+    mae: float | None
+    r2: float | None
+    max_error: float | None
+    obs_fit: float | None  # mean |model - reading| over the field readings
+    typical_miss: float | None  # 95% miss on fresh random runs (the learner's own estimate)
+
+
+class AppHistoryOut(BaseModel):
+    runs: int
+    rmse: float
+    r2: float
+    ready: bool
+
+
+class AppRunOut(BaseModel):
+    x1: float
+    x2: float
+    u: float
+    v: float
+    value: float
+    reason: str
+
+
+class AppObservationOut(BaseModel):
+    id: int
+    x1: float
+    x2: float
+    u: float
+    v: float
+    value: float
+    kind: str
+    source: str
+    before: float | None
+    now: float | None  # what the current model says at the same point
+    created_at: datetime
+
+
+class AppFeatureOut(BaseModel):
+    kind: str  # min | max
+    x1: float
+    x2: float
+    value: float
+    depth: float
+
+
+class AppPointOut(BaseModel):
+    x1: float
+    x2: float
+    u: float
+    v: float
+    reason: str
+
+
+class AppSummaryOut(BaseModel):
+    key: str
+    name: str
+    tagline: str
+    description: str
+    reference_name: str
+    inputs: list[AppInputOut]
+    output_label: str
+    output_unit: str
+    bands: list[AppBandOut]
+    examples: list[AppExampleOut]
+    hue: int
+    budget: int
+    status: Literal["idle", "training", "ready", "budget"]
+    runs: int
+    observations: int
+    version: int
+    metrics: AppMetricsOut
+
+
+class AppStateOut(AppSummaryOut):
+    grid: int
+    z: str | None  # base64 little-endian float32, grid*grid, node i = a*grid + b at (a, b)/(grid-1)
+    z_min: float | None
+    z_max: float | None
+    sim_runs: list[AppRunOut]
+    readings: list[AppObservationOut]
+    features: list[AppFeatureOut]
+    suggestions: list[AppPointOut]
+    history: list[AppHistoryOut]
+    stop: StopOut | None
+    train_ms: float | None
+    trained_at: datetime | None
+
+
+class AppTrainIn(BaseModel):
+    reset: bool = Field(default=True, description="Throw away the reference runs and learn again from scratch")
+    pace_ms: int = Field(default=60, ge=0, le=1000, description="Pause between batches, so the web app can animate")
+    budget: int | None = Field(default=None, ge=24, le=600, description="Most reference runs to buy (default per app)")
+
+
+class AppPredictIn(BaseModel):
+    x1: float
+    x2: float
+
+    @field_validator("x1", "x2")
+    @classmethod
+    def _finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("must be a finite number")
+        return v
+
+
+class AppDetailOut(BaseModel):
+    label: str
+    value: str
+
+
+class AppPredictOut(BaseModel):
+    x1: float
+    x2: float
+    value: float
+    low: float  # estimated 95% interval
+    high: float
+    band: AppBandOut
+    reference: float  # what the expensive reference model says (shown for checking)
+    error: float
+    sensitivity: list[float]  # change in output per unit of each input, at this point
+    details: list[AppDetailOut]
+    nearest: float  # distance to the closest data point, as a share of the map
+    micros: float  # time to evaluate the surrogate, microseconds
+    version: int
+
+
+class AppReadingIn(BaseModel):
+    x1: float
+    x2: float
+    value: float
+    kind: Literal["sensor", "verified"] = "sensor"
+
+    @field_validator("x1", "x2", "value")
+    @classmethod
+    def _finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("must be a finite number")
+        return v
+
+
+class AppReadingsIn(BaseModel):
+    readings: list[AppReadingIn] = Field(min_length=1, max_length=500)
+    source: Literal["manual", "csv", "sample", "feed"] = "manual"
+
+
+class AppSampleIn(BaseModel):
+    n: int = Field(default=1, ge=1, le=50)
+    source: Literal["sample", "feed"] = "sample"
+
+
+class AppRetrainItemOut(BaseModel):
+    id: int
+    x1: float
+    x2: float
+    value: float
+    before: float  # model's prediction at the point before retraining
+    after: float  # after retraining
+    tolerance: float  # how far off the model may be before the reading counts as a surprise
+    surprise: bool  # |before - value| > tolerance (the allowed miss, widened by sensor noise for sensor readings)
+
+
+class AppRetrainOut(BaseModel):
+    items: list[AppRetrainItemOut]
+    version: int
+    retrain_ms: float
+    metrics_before: AppMetricsOut
+    metrics_after: AppMetricsOut
+    allowed_miss: float
+    max_shift: float  # largest change of the surface anywhere on the grid, output units
+    suggestions: list[AppPointOut]
+
+
+class AppLandscapeOut(BaseModel):
+    peaks: int  # local maxima deeper than 5% of the output range
+    valleys: int
+    thumb: str  # base64 little-endian float32, thumb_grid*thumb_grid, same node layout as the main grid
+
+
+class AppTermOut(BaseModel):
+    symbol: str
+    meaning: str
+
+
+class AppBenchmarkOut(BaseModel):
+    key: str
+    name: str
+    note: str
+    landscape: AppLandscapeOut
+    distance: float  # between (peaks, valleys) counts of the benchmark and the application
+    closest: bool
+    reason: str
+
+
+class AppModelOut(BaseModel):
+    function_name: str
+    formula: list[str]
+    terms: list[AppTermOut]
+    shape: str
+    general: str
+    thumb_grid: int
+    landscape: AppLandscapeOut
+    benchmarks: list[AppBenchmarkOut]

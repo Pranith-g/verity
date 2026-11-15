@@ -24,10 +24,11 @@ class ThinPlate:
     """Interpolating thin-plate spline through (points, values).
 
     The fit is exact at the training points, which is what lets a sample placed on a
-    feature count as a check of that feature.
+    feature count as a check of that feature. ``smooth`` (one value per point, or one for all)
+    relaxes that for noisy points: a larger value lets the surface pass further from the point.
     """
 
-    def __init__(self, points: Array, values: Array) -> None:
+    def __init__(self, points: Array, values: Array, smooth: Array | float | None = None) -> None:
         points = np.asarray(points, dtype=float)
         values = np.asarray(values, dtype=float)
         if points.ndim != 2 or points.shape[1] != 2:
@@ -39,6 +40,8 @@ class ThinPlate:
         n = len(values)
         a = np.zeros((n + 3, n + 3))
         a[:n, :n] = _phi(_sqdist(points, points))
+        if smooth is not None:
+            a[:n, :n] += np.diag(np.broadcast_to(np.asarray(smooth, dtype=float), (n,)))
         a[:n, n] = 1.0
         a[:n, n + 1 :] = points
         a[n, :n] = 1.0

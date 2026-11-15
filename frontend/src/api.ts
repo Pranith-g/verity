@@ -1,5 +1,5 @@
 import { createSseParser } from './lib/sse';
-import type { InitDesignReport, Overview, RaceEvent, RaceInfo, Simulator, Stop, Study, StudyCreate, StudyState, Suggestion } from './types';
+import type { AppKey, AppModel, AppPrediction, AppReadingIn, AppRetrain, AppState, AppSummary, InitDesignReport, Overview, RaceEvent, RaceInfo, Simulator, Stop, Study, StudyCreate, StudyState, Suggestion } from './types';
 
 const BASE: string = import.meta.env.VITE_API_BASE ?? '';
 const KEY_STORE = 'vdc_api_key';
@@ -87,6 +87,19 @@ export const api = {
   stopAutorun: (id: string) => req<unknown>(`/api/studies/${id}/autorun`, { method: 'DELETE' }),
 
   overview: () => req<Overview>('/api/overview'),
+
+  apps: () => req<AppSummary[]>('/api/apps'),
+  app: (key: AppKey, signal?: AbortSignal) => req<AppState>(`/api/apps/${key}`, { signal }),
+  appModel: (key: AppKey) => req<AppModel>(`/api/apps/${key}/model`),
+  trainApp: (key: AppKey) => req<unknown>(`/api/apps/${key}/train`, { method: 'POST', body: { reset: true, pace_ms: 70 } }),
+  predict: (key: AppKey, x1: number, x2: number, signal?: AbortSignal) =>
+    req<AppPrediction>(`/api/apps/${key}/predict`, { method: 'POST', body: { x1, x2 }, signal }),
+  addReadings: (key: AppKey, readings: AppReadingIn[], source: 'manual' | 'csv' = 'manual') =>
+    req<AppRetrain>(`/api/apps/${key}/readings`, { method: 'POST', body: { readings, source } }),
+  sampleReadings: (key: AppKey, n: number, source: 'sample' | 'feed') =>
+    req<AppRetrain>(`/api/apps/${key}/readings/sample`, { method: 'POST', body: { n, source } }),
+  deleteReading: (key: AppKey, id: number) => req<void>(`/api/apps/${key}/readings/${id}`, { method: 'DELETE' }),
+  clearReadings: (key: AppKey) => req<{ removed: number }>(`/api/apps/${key}/readings`, { method: 'DELETE' }),
   initDesign: () => req<InitDesignReport>('/api/benchmarks/init-design'),
 
   /** Start a race. The server caps how many run at once, so a 429 waits briefly and tries again. */

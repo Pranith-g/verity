@@ -72,3 +72,20 @@ class RaceRecord(Base):
     seed: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(8), default="running")  # running | done | failed | stopped
     summary: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+
+class AppObservation(Base):
+    """A field reading added to one of the real-world applications (air quality, traffic, weather)."""
+
+    __tablename__ = "app_observations"
+    __table_args__ = (Index("ix_app_obs_app", "app_key"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    app_key: Mapped[str] = mapped_column(String(40))
+    x1: Mapped[float] = mapped_column(Float)
+    x2: Mapped[float] = mapped_column(Float)
+    value: Mapped[float] = mapped_column(Float)
+    kind: Mapped[str] = mapped_column(String(10), default="sensor")  # sensor (noisy) | verified (exact)
+    source: Mapped[str] = mapped_column(String(10), default="manual")  # manual | sample | feed | csv
+    before: Mapped[float | None] = mapped_column(Float, nullable=True)  # model's prediction before it was added
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)

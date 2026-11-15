@@ -1,9 +1,11 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { api, apiKey } from './api';
+import { AppGlyph } from './components/AppBits';
 import { ErrorNote, LiveDot, Num, Sparkline } from './components/bits';
 import {
   AlertIcon,
+  BoltIcon,
   BookIcon,
   ClockIcon,
   CubeIcon,
@@ -19,6 +21,7 @@ import {
 } from './components/icons';
 import { duration, int } from './lib/format';
 import { useClock } from './lib/motion';
+import { AppsPage } from './pages/AppsPage';
 import { OpeningDesignPage } from './pages/OpeningDesignPage';
 import { RacePage } from './pages/RacePage';
 import { StudiesPage, STATUS_TONE } from './pages/StudiesPage';
@@ -129,6 +132,8 @@ export function App() {
             <Route path="/studies" element={<StudiesPage />} />
             <Route path="/studies/:id" element={<StudyPage />} />
             <Route path="/opening-design" element={<OpeningDesignPage />} />
+            <Route path="/apps" element={<AppsPage />} />
+            <Route path="/apps/:key" element={<AppsPage />} />
             <Route
               path="*"
               element={
@@ -198,7 +203,9 @@ function Shell({ gate, version, children }: { gate: Gate; version: string; child
       ? 'Studies'
       : location.pathname === '/opening-design'
         ? 'Opening design'
-        : 'Live benchmark';
+        : location.pathname.startsWith('/apps')
+          ? 'Applications'
+          : 'Live benchmark';
 
   return (
     <div className={`shell${drawer ? ' drawer-open' : ''}`}>
@@ -279,6 +286,11 @@ function Shell({ gate, version, children }: { gate: Gate; version: string; child
               <CubeIcon size={16} />
               Live benchmark
             </NavLink>
+            <NavLink to="/apps" className="side-link apps-link">
+              <BoltIcon size={16} />
+              Applications
+              <span className="side-new mono">LIVE</span>
+            </NavLink>
             <NavLink to="/studies" className="side-link">
               <LayersIcon size={16} />
               Studies
@@ -294,6 +306,25 @@ function Shell({ gate, version, children }: { gate: Gate; version: string; child
               <ExternalIcon size={12} />
             </a>
           </nav>
+        </div>
+        <div className="side-block">
+          <span className="side-h">Applications</span>
+          <ul className="side-sims">
+            {(
+              [
+                ['air-quality', 'Air quality'],
+                ['traffic', 'Traffic flow'],
+                ['weather', 'Weather'],
+              ] as const
+            ).map(([k, name]) => (
+              <li key={k}>
+                <NavLink to={`/apps/${k}`} className="side-link sim side-app">
+                  <AppGlyph app={k} size={16} />
+                  {name}
+                </NavLink>
+              </li>
+            ))}
+          </ul>
         </div>
         {open && <SimList sims={sims} />}
         {open && studies.length > 0 && (

@@ -282,3 +282,130 @@ export interface InitTiming {
   finish: PairedTest;
   compute: PairedTest;
 }
+
+/* ---------- Real-world applications ---------- */
+export type AppKey = 'air-quality' | 'traffic' | 'weather';
+export type AppStatus = 'idle' | 'training' | 'ready' | 'budget';
+
+export interface AppInput {
+  key: string;
+  label: string;
+  unit: string;
+  low: number;
+  high: number;
+  step: number;
+  fmt: 'number' | 'hour' | 'weekday' | 'doy';
+}
+export interface AppBand {
+  upto: number | null;
+  label: string;
+  color: string;
+  advice: string;
+}
+export interface AppMetrics {
+  rmse: number | null;
+  mae: number | null;
+  r2: number | null;
+  max_error: number | null;
+  obs_fit: number | null;
+  typical_miss: number | null;
+}
+export interface AppSummary {
+  key: AppKey;
+  name: string;
+  tagline: string;
+  description: string;
+  reference_name: string;
+  inputs: [AppInput, AppInput];
+  output_label: string;
+  output_unit: string;
+  bands: AppBand[];
+  examples: { label: string; x1: number; x2: number }[];
+  hue: number;
+  budget: number;
+  status: AppStatus;
+  runs: number;
+  observations: number;
+  version: number;
+  metrics: AppMetrics;
+}
+export interface AppPoint {
+  x1: number;
+  x2: number;
+  u: number;
+  v: number;
+  reason: string;
+}
+export interface AppReading {
+  id: number;
+  x1: number;
+  x2: number;
+  u: number;
+  v: number;
+  value: number;
+  kind: 'sensor' | 'verified';
+  source: 'manual' | 'csv' | 'sample' | 'feed';
+  before: number | null;
+  now: number | null;
+  created_at: string;
+}
+export interface AppState extends AppSummary {
+  grid: number;
+  z: string | null;
+  z_min: number | null;
+  z_max: number | null;
+  sim_runs: (AppPoint & { value: number })[];
+  readings: AppReading[];
+  features: { kind: 'min' | 'max'; x1: number; x2: number; value: number; depth: number }[];
+  suggestions: AppPoint[];
+  history: { runs: number; rmse: number; r2: number; ready: boolean }[];
+  stop: Stop | null;
+  train_ms: number | null;
+  trained_at: string | null;
+}
+export interface AppPrediction {
+  x1: number;
+  x2: number;
+  value: number;
+  low: number;
+  high: number;
+  band: AppBand;
+  reference: number;
+  error: number;
+  sensitivity: [number, number];
+  details: { label: string; value: string }[];
+  nearest: number;
+  micros: number;
+  version: number;
+}
+export interface AppReadingIn {
+  x1: number;
+  x2: number;
+  value: number;
+  kind: 'sensor' | 'verified';
+}
+export interface AppRetrain {
+  items: { id: number; x1: number; x2: number; value: number; before: number; after: number; tolerance: number; surprise: boolean }[];
+  version: number;
+  retrain_ms: number;
+  metrics_before: AppMetrics;
+  metrics_after: AppMetrics;
+  allowed_miss: number;
+  max_shift: number;
+  suggestions: AppPoint[];
+}
+export interface AppLandscape {
+  peaks: number;
+  valleys: number;
+  thumb: string;
+}
+export interface AppModel {
+  function_name: string;
+  formula: string[];
+  terms: { symbol: string; meaning: string }[];
+  shape: string;
+  general: string;
+  thumb_grid: number;
+  landscape: AppLandscape;
+  benchmarks: { key: string; name: string; note: string; landscape: AppLandscape; distance: number; closest: boolean; reason: string }[];
+}
