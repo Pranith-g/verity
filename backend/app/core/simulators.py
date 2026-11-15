@@ -1,7 +1,14 @@
-"""Built-in test simulators: cheap stand-ins for an expensive model.
+"""Built-in simulators: cheap stand-ins for an expensive model.
 
-Each one is a function of two inputs on a box. They exist for the benchmark and for
-trying the service out; real studies bring their own simulator through ask/tell.
+Two separate groups, each a function of two inputs on a box:
+
+* ``TEST_FUNCTIONS`` - the analytic textbook surfaces (Peaks, Himmelblau, ...).
+* ``REAL_DATASETS`` - measured data on a grid, read from ``app/data/real/`` (see
+  ``real_data.py``).
+
+``SIMULATORS`` is both together, for code that just needs "a simulator by key". They exist
+for the benchmark and for trying the service out; real studies bring their own simulator
+through ask/tell.
 """
 
 from __future__ import annotations
@@ -21,6 +28,10 @@ class Simulator:
     note: str
     box: tuple[float, float, float, float]  # x1 low, x1 high, x2 low, x2 high
     fn: Callable[[Array, Array], Array]
+    kind: str = "test"  # "test" (analytic function) or "real" (measured data)
+    inputs: tuple[str, str] = ("x1", "x2")
+    output: str = "output"
+    source: str = ""  # where real data came from, with its required attribution
 
     def at_unit(self, uv: Array) -> Array:
         """Evaluate at points given on the unit square, shape (n, 2)."""
@@ -67,7 +78,7 @@ def _rosenbrock(x: Array, y: Array) -> Array:
 
 _PI = float(np.pi)
 
-SIMULATORS: dict[str, Simulator] = {
+TEST_FUNCTIONS: dict[str, Simulator] = {
     s.key: s
     for s in [
         Simulator("peaks", "Peaks", "Three hills, three hollows. A friendly start.", (-3, 3, -3, 3), _peaks),
@@ -105,3 +116,8 @@ SIMULATORS: dict[str, Simulator] = {
         ),
     ]
 }
+
+# Imported last: real_data needs the Simulator class defined above.
+from .real_data import REAL_DATASETS  # noqa: E402
+
+SIMULATORS: dict[str, Simulator] = {**TEST_FUNCTIONS, **REAL_DATASETS}

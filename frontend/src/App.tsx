@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { BrowserRouter, Link, NavLink, Route, Routes, useLocation, useSearchParams } from 'react-router-dom';
 import { api, apiKey } from './api';
 import { ErrorNote, LiveDot, Num, Sparkline } from './components/bits';
@@ -8,6 +8,7 @@ import {
   ClockIcon,
   CubeIcon,
   ExternalIcon,
+  GridIcon,
   HexIcon,
   KeyIcon,
   LayersIcon,
@@ -18,6 +19,7 @@ import {
 } from './components/icons';
 import { duration, int } from './lib/format';
 import { useClock } from './lib/motion';
+import { OpeningDesignPage } from './pages/OpeningDesignPage';
 import { RacePage } from './pages/RacePage';
 import { StudiesPage, STATUS_TONE } from './pages/StudiesPage';
 import { StudyPage } from './pages/StudyPage';
@@ -126,6 +128,7 @@ export function App() {
             <Route path="/" element={<RacePage />} />
             <Route path="/studies" element={<StudiesPage />} />
             <Route path="/studies/:id" element={<StudyPage />} />
+            <Route path="/opening-design" element={<OpeningDesignPage />} />
             <Route
               path="*"
               element={
@@ -189,7 +192,13 @@ function Shell({ gate, version, children }: { gate: Gate; version: string; child
 
   const uptime = overview ? overview.uptime_s + Math.max(0, (now.getTime() - fetchedAt) / 1000) : 0;
   const live = overview ? overview.races_running + overview.autoruns_active : 0;
-  const context = location.pathname.startsWith('/studies/') ? 'Study workbench' : location.pathname === '/studies' ? 'Studies' : 'Live benchmark';
+  const context = location.pathname.startsWith('/studies/')
+    ? 'Study workbench'
+    : location.pathname === '/studies'
+      ? 'Studies'
+      : location.pathname === '/opening-design'
+        ? 'Opening design'
+        : 'Live benchmark';
 
   return (
     <div className={`shell${drawer ? ' drawer-open' : ''}`}>
@@ -275,6 +284,10 @@ function Shell({ gate, version, children }: { gate: Gate; version: string; child
               Studies
               {overview && overview.studies > 0 && <span className="side-count mono">{overview.studies}</span>}
             </NavLink>
+            <NavLink to="/opening-design" className="side-link">
+              <GridIcon size={16} />
+              Opening design
+            </NavLink>
             <a href="/docs" className="side-link">
               <BookIcon size={16} />
               API reference
@@ -338,22 +351,41 @@ function SimList({ sims }: { sims: Simulator[] }) {
   const location = useLocation();
   const [params] = useSearchParams();
   const active = location.pathname === '/' ? params.get('sim') ?? 'peaks' : null;
-  const listRef = useRef<HTMLUListElement>(null);
+  const tests = sims.filter((s) => s.kind !== 'real');
+  const real = sims.filter((s) => s.kind === 'real');
+  const row = (s: { key: string; name: string; note: string }, i: number, glyph: ReactNode) => (
+    <li key={s.key} style={{ ['--i' as string]: i }}>
+      <Link to={`/?sim=${s.key}`} className={`side-link sim${active === s.key ? ' active' : ''}`} aria-current={active === s.key ? 'true' : undefined} title={s.note}>
+        {glyph}
+        {s.name}
+        {active === s.key && <span className="side-check" aria-hidden="true" />}
+      </Link>
+    </li>
+  );
   return (
-    <div className="side-block">
-      <span className="side-h">Simulators</span>
-      <ul className="side-sims" ref={listRef}>
-        {(sims.length ? sims : [{ key: 'peaks', name: 'Peaks', note: '', box: [0, 0, 0, 0] as [number, number, number, number] }]).map((s, i) => (
-          <li key={s.key} style={{ ['--i' as string]: i }}>
-            <Link to={`/?sim=${s.key}`} className={`side-link sim${active === s.key ? ' active' : ''}`} aria-current={active === s.key ? 'true' : undefined} title={s.note}>
-              <SimGlyph seed={i} />
-              {s.name}
-              {active === s.key && <span className="side-check" aria-hidden="true" />}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <>
+      <div className="side-block">
+        <span className="side-h">Test functions</span>
+        <ul className="side-sims">{(tests.length ? tests : [{ key: 'peaks', name: 'Peaks', note: '' }]).map((s, i) => row(s, i, <SimGlyph seed={i} />))}</ul>
+      </div>
+      {real.length > 0 && (
+        <div className="side-block">
+          <span className="side-h">Real data</span>
+          <ul className="side-sims">{real.map((s, i) => row(s, tests.length + i, <TerrainGlyph />))}</ul>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** Contour lines over a ridge: marks a measured dataset, not a formula. */
+function TerrainGlyph() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" className="sim-glyph">
+      <path d="M1 13.5 6 4l3 5 2-3 4 7.5z" fill="hsl(28 85% 52%)" opacity="0.35" />
+      <path d="M1 13.5 6 4l3 5 2-3 4 7.5" fill="none" stroke="hsl(28 90% 62%)" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M4.2 9.5h3.6M9.6 10.5h2.6" stroke="hsl(28 90% 62%)" strokeWidth="1" strokeLinecap="round" opacity="0.7" />
+    </svg>
   );
 }
 

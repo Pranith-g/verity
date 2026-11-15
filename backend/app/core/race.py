@@ -12,7 +12,16 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .learner import Field, LearnerConfig, StopStatus, build_field, certify, depth_threshold, propose
+from .learner import (
+    Field,
+    LearnerConfig,
+    StopStatus,
+    build_field,
+    certify,
+    depth_threshold,
+    opening_design,
+    propose,
+)
 from .referee import Audit, Truth, audit, make_truth
 from .simulators import SIMULATORS, Simulator
 
@@ -230,6 +239,6 @@ def make_race(
 ) -> Race:  # fmt: skip
     cfg = cfg or LearnerConfig()
     truth = make_truth(SIMULATORS[simulator], cfg.grid, tau)
-    init = np.random.default_rng(seed * 7919 + 13).random((cfg.n_init, 2))
+    init = opening_design(cfg.n_init, seed * 7919 + 13, cfg)  # shared by all three, so the start is fair
     learners = [RaceLearner(k, truth, seed * 101 + i * 17 + 1, init, cfg, tau) for i, k in enumerate(KINDS)]
     return Race(truth, learners, budget, batch)

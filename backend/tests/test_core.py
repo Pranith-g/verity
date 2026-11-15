@@ -3,10 +3,21 @@
 import numpy as np
 import pytest
 
-from app.core.learner import LearnerConfig, bowl_vertex, build_field, certify, depth_threshold, largest_gap, propose
+from app.core.learner import (
+    LearnerConfig,
+    bowl_vertex,
+    build_field,
+    certify,
+    depth_threshold,
+    largest_gap,
+    lhs_maximin,
+    min_pair_distance,
+    propose,
+)
 from app.core.race import make_race, nelder_mead_trace
+from app.core.real_data import REAL_DATASETS
 from app.core.referee import audit, make_truth
-from app.core.simulators import SIMULATORS
+from app.core.simulators import SIMULATORS, TEST_FUNCTIONS
 from app.core.surrogate import ThinPlate, grid_points
 from app.core.topology import features
 
@@ -89,6 +100,27 @@ def test_propose_starts_with_random_runs_and_respects_pending():
     assert len(second) == CFG.n_init - 6  # never more initial runs than needed
 
 
+def test_lhs_maximin_is_latin_deterministic_and_well_spread():
+    a, b = lhs_maximin(12, 7), lhs_maximin(12, 7)
+    assert np.array_equal(a, b)  # one design per seed, however often it is asked for
+    for k in range(2):  # exactly one point in every row and every column
+        assert sorted(np.floor(a[:, k] * 12).astype(int)) == list(range(12))
+    rand = [np.random.default_rng(s).random((12, 2)) for s in range(20)]
+    assert min_pair_distance(a) > 2 * np.median([min_pair_distance(r) for r in rand])
+    assert largest_gap(a, 49)[0] < np.median([largest_gap(r, 49)[0] for r in rand])
+
+
+def test_opening_runs_come_from_one_design_across_calls():
+    """Split over two calls (as parallel workers would), the opening runs are still the study's single LHS."""
+    design = lhs_maximin(CFG.n_init, 42)
+    first = propose(np.empty((0, 2)), np.empty(0), np.empty((0, 2)), 5, np.random.default_rng(0), 0.0, CFG, seed=42)
+    pend = np.array([[p.u, p.v] for p in first])
+    second = propose(np.empty((0, 2)), np.empty(0), pend, 20, np.random.default_rng(9), 0.0, CFG, seed=42)
+    got = np.array([[p.u, p.v] for p in first + second])
+    assert len(got) == CFG.n_init and all(p.reason == "init" for p in first + second)
+    assert np.allclose(np.sort(got, axis=0), np.sort(design, axis=0))
+
+
 def test_propose_targets_the_surrogates_own_extrema_and_never_repeats_points():
     sim = SIMULATORS["peaks"]
     rng = np.random.default_rng(4)
@@ -147,3 +179,27 @@ def test_verify_wins_on_peaks_and_its_stop_rule_is_right():
     assert s["verify"]["declared_at"] is not None and s["verify"]["declared_correct"] is True
     assert s["verify"]["rmse"] < s["random"]["rmse"]
     assert all(v["runs"] == 300 for v in s.values())
+
+
+def test_real_data_is_kept_apart_from_the_test_functions():
+    assert set(TEST_FUNCTIONS).isdisjoint(REAL_DATASETS)
+    assert {s.kind for s in TEST_FUNCTIONS.values()} == {"test"}
+    assert {s.kind for s in REAL_DATASETS.values()} == {"real"}
+    assert SIMULATORS == {**TEST_FUNCTIONS, **REAL_DATASETS}
+
+
+def test_terrain_grid_is_read_back_exactly_and_interpolated_between_cells():
+    sim = REAL_DATASETS["terrain-matterhorn"]
+    z, (x0, x1, y0, y1) = sim.fn.z, sim.box
+    ny, nx = z.shape
+    assert min(ny, nx) >= 50 and 1000 < z.min() < z.max() < 4500  # metres, an alpine window
+    xs, ys = np.linspace(x0, x1, nx), np.linspace(y0, y1, ny)
+    assert sim.at(xs[7], ys[11]) == pytest.approx(z[11, 7])
+    mid = sim.at((xs[7] + xs[8]) / 2, (ys[11] + ys[12]) / 2)
+    assert mid == pytest.approx(z[11:13, 7:9].mean())
+    assert sim.at(x0 - 1, y0 - 1) == pytest.approx(z[0, 0])  # outside the box: the nearest edge
+
+
+def test_terrain_has_features_for_the_referee():
+    truth = make_truth(REAL_DATASETS["terrain-matterhorn"], CFG.grid, 0.05)
+    assert len(truth.significant) >= 3

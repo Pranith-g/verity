@@ -10,6 +10,7 @@ any time, by any process.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 import numpy as np
 
@@ -23,7 +24,8 @@ Array = np.ndarray
 class LearnerConfig:
     grid: int = 49  # resolution used to list the surrogate's features
     explore: float = 0.35  # share of each batch spent on fresh random points
-    n_init: int = 12  # random runs before the first fit
+    n_init: int = 12  # opening runs before the first fit
+    init_design: str = "lhs"  # "lhs": maximin Latin hypercube opening runs; "random": uniform random
     on_feature: float = 0.0125  # a sample this close to an extremum counts as "on it"
     polish_radius: float = 0.0625  # a trusted extremum has >= 4 samples inside this radius (3 grid cells)
     polish_count: int = 4
@@ -120,6 +122,82 @@ class _Taken:
         return int((((a - (u, v)) ** 2).sum(axis=1) <= r * r).sum())
 
 
+_PHI_P = 15.0  # Morris-Mitchell exponent: large enough that phi ranks designs like maximin does
+
+
+def _inv_pow(pts: Array, row: Array) -> Array:
+    """d^-p from one point to every point (0 for itself), with d the Euclidean distance."""
+    d2 = ((pts - row) ** 2).sum(axis=1)
+    out = np.zeros_like(d2)
+    nz = d2 > 0
+    out[nz] = d2[nz] ** (-_PHI_P / 2)
+    return out
+
+
+@lru_cache(maxsize=256)
+def _lhs_maximin(n: int, seed: int, dim: int, starts: int) -> Array:
+    """Local search on the Morris-Mitchell score sum(d^-p) over all pairs, which is smooth enough
+    to climb, unlike the bare minimum distance."""
+    rng = np.random.default_rng(seed)
+    best: Array | None = None
+    best_phi = float("inf")
+    for _ in range(starts):
+        # one point per row and per column of an n x n grid, placed at the cell centre
+        ranks = np.column_stack([rng.permutation(n) for _ in range(dim)])
+        pts = (ranks + 0.5) / n
+        P = np.array([_inv_pow(pts, pts[i]) for i in range(n)])
+        improved = True
+        while improved:  # swap one coordinate between two points while that spreads them out
+            improved = False
+            for k in range(dim):
+                for i in range(n - 1):
+                    for j in range(i + 1, n):
+                        pts[[i, j], k] = pts[[j, i], k]  # the i-j distance itself is unchanged
+                        ri, rj = _inv_pow(pts, pts[i]), _inv_pow(pts, pts[j])
+                        if ri.sum() + rj.sum() < P[i].sum() + P[j].sum() - 1e-9 * (P[i].sum() + P[j].sum()):
+                            P[i], P[j] = ri, rj
+                            P[:, i], P[:, j] = ri, rj
+                            improved = True
+                        else:
+                            pts[[i, j], k] = pts[[j, i], k]
+        cur = float(P.sum())
+        if cur < best_phi:
+            best, best_phi = pts.copy(), cur
+    assert best is not None
+    best.setflags(write=False)
+    return best
+
+
+def lhs_maximin(n: int, seed: int, dim: int = 2, starts: int = 4) -> Array:
+    """A maximin Latin hypercube: ``n`` points, one in every row and every column of an n x n
+    grid, arranged so the closest pair is as far apart as possible (Euclidean).
+
+    Deterministic for a given seed, so a study can hand its opening runs out over several
+    calls, or to parallel workers, without regenerating a different design each time.
+    """
+    if n <= 0:
+        return np.empty((0, dim))
+    return _lhs_maximin(int(n), int(seed), int(dim), int(starts)).copy()
+
+
+def min_pair_distance(points: Array) -> float:
+    """Smallest Euclidean distance between any two points (the maximin score of a design)."""
+    pts = np.asarray(points, dtype=float).reshape(-1, 2)
+    if len(pts) < 2:
+        return float("inf")
+    d = ((pts[:, None, :] - pts[None, :, :]) ** 2).sum(axis=2)
+    return float(np.sqrt(d[np.triu_indices(len(pts), 1)].min()))
+
+
+def opening_design(n: int, seed: int, cfg: LearnerConfig) -> Array:
+    """The opening runs for a study or race, by ``cfg.init_design``."""
+    if cfg.init_design == "lhs":
+        return lhs_maximin(n, seed)
+    if cfg.init_design == "random":
+        return np.random.default_rng(seed).random((n, 2))
+    raise ValueError(f"unknown init_design {cfg.init_design!r}")
+
+
 def largest_gap(points: Array, grid: int) -> tuple[float, tuple[float, float]]:
     """Radius and centre of the biggest hole in the sampling."""
     nodes = grid_points(grid)
@@ -185,11 +263,15 @@ def propose(
     depth: float,
     cfg: LearnerConfig,
     fld: Field | None = None,
+    seed: int | None = None,
 ) -> list[Proposal]:
     """Name the next ``k`` runs to buy.
 
     points/values: completed runs on the unit square. pending: points already handed
     out but not reported back yet (so parallel workers never get the same point).
+    seed: fixes the opening design for the whole study. Pass the same value on every call,
+    so the opening runs come from one design however they are split across calls; without
+    it the design is drawn from ``rng`` and only holds together within a single call.
     """
     points = np.asarray(points, dtype=float).reshape(-1, 2)
     pending = np.asarray(pending, dtype=float).reshape(-1, 2)
@@ -204,11 +286,19 @@ def propose(
         taken.add(u, v)
         return True
 
-    # Before the first fit: plain random runs.
+    # Before the first fit: the opening design. Its points are handed out in order; any that
+    # are already paid for or pending are skipped by the duplicate check, so repeated or
+    # parallel calls carry on through the same design instead of starting a new one.
     if len(points) < cfg.n_init:
-        need = min(k, cfg.n_init - len(points) - len(pending))
+        need = max(0, min(k, cfg.n_init - len(points) - len(pending)))
+        if need:
+            design_seed = int(rng.integers(2**31)) if seed is None else int(seed)
+            for u, v in opening_design(cfg.n_init, design_seed, cfg):
+                if len(out) >= need:
+                    break
+                take(float(u), float(v), "init", None)
         guard = 0
-        while len(out) < max(need, 0) and guard < 20 * k:
+        while len(out) < need and guard < 20 * k:  # design used up (runs reported off-design)
             guard += 1
             take(float(rng.random()), float(rng.random()), "init", None)
         if out or len(points) < 3:

@@ -1,5 +1,5 @@
 import { createSseParser } from './lib/sse';
-import type { Overview, RaceEvent, RaceInfo, Simulator, Stop, Study, StudyCreate, StudyState, Suggestion } from './types';
+import type { InitDesignReport, Overview, RaceEvent, RaceInfo, Simulator, Stop, Study, StudyCreate, StudyState, Suggestion } from './types';
 
 const BASE: string = import.meta.env.VITE_API_BASE ?? '';
 const KEY_STORE = 'vdc_api_key';
@@ -87,6 +87,7 @@ export const api = {
   stopAutorun: (id: string) => req<unknown>(`/api/studies/${id}/autorun`, { method: 'DELETE' }),
 
   overview: () => req<Overview>('/api/overview'),
+  initDesign: () => req<InitDesignReport>('/api/benchmarks/init-design'),
 
   /** Start a race. The server caps how many run at once, so a 429 waits briefly and tries again. */
   async createRace(body: { simulator: string; tau: number; budget: number; seed: number }, signal?: AbortSignal): Promise<RaceInfo> {

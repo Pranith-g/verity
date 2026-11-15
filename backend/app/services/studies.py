@@ -137,18 +137,21 @@ def create(session: Session, body: StudyCreate) -> Study:
     if body.max_runs > settings.max_runs_per_study:
         raise HTTPException(422, f"max_runs may be at most {settings.max_runs_per_study}")
     inputs = [i.model_dump() for i in body.inputs] if body.inputs else None
+    output_name = body.output_name
     if body.demo_simulator is not None:
         sim = SIMULATORS.get(body.demo_simulator)
         if sim is None:
             raise HTTPException(422, f"unknown simulator '{body.demo_simulator}'")
         inputs = [
-            {"name": "x1", "low": sim.box[0], "high": sim.box[1]},
-            {"name": "x2", "low": sim.box[2], "high": sim.box[3]},
+            {"name": sim.inputs[0], "low": sim.box[0], "high": sim.box[1]},
+            {"name": sim.inputs[1], "low": sim.box[2], "high": sim.box[3]},
         ]
+        if "output_name" not in body.model_fields_set:
+            output_name = sim.output
     study = Study(
         name=body.name.strip(), seed=body.seed, max_runs=body.max_runs, demo_simulator=body.demo_simulator,
         config={
-            "inputs": inputs, "output_name": body.output_name,
+            "inputs": inputs, "output_name": output_name,
             "min_depth_rel": body.min_depth_rel, "min_depth_abs": body.min_depth_abs,
         },
         history=[],
@@ -181,7 +184,7 @@ def ask(session: Session, study: Study, n: int) -> tuple[list[SuggestionOut], st
         pend = np.array([[r.u, r.v] for r in pending], dtype=float).reshape(-1, 2)
         rng = np.random.default_rng([study.seed, len(done), len(pending)])
         fld = _field_for(study.id, pts, vals) if len(done) >= CFG.n_init else None
-        props = propose(pts, vals, pend, n, rng, _depth(study, vals), CFG, fld)
+        props = propose(pts, vals, pend, n, rng, _depth(study, vals), CFG, fld, seed=study.seed)
         rows = [Run(study_id=study.id, u=p.u, v=p.v, reason=p.reason, predicted=p.predicted) for p in props]
         session.add_all(rows)
         session.commit()

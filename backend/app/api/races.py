@@ -24,7 +24,7 @@ router = APIRouter(prefix="/api", tags=["benchmark"], dependencies=[Depends(requ
 
 @router.get("/simulators", response_model=list[SimulatorOut])
 def simulators() -> list[SimulatorOut]:
-    return [SimulatorOut(key=s.key, name=s.name, note=s.note, box=s.box) for s in SIMULATORS.values()]
+    return [SimulatorOut(**{f: getattr(s, f) for f in SimulatorOut.model_fields}) for s in SIMULATORS.values()]
 
 
 @router.post("/races", response_model=RaceOut, status_code=201)

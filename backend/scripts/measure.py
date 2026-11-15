@@ -11,7 +11,7 @@ from concurrent.futures import ProcessPoolExecutor
 from statistics import median
 
 from app.core.race import KINDS, make_race
-from app.core.simulators import SIMULATORS
+from app.core.simulators import TEST_FUNCTIONS
 
 
 def one(args: tuple[str, int, int]) -> dict:
@@ -23,7 +23,7 @@ def one(args: tuple[str, int, int]) -> dict:
 
 
 def main() -> None:
-    keys = sys.argv[1].split(",") if len(sys.argv) > 1 else list(SIMULATORS)
+    keys = sys.argv[1].split(",") if len(sys.argv) > 1 else list(TEST_FUNCTIONS)
     seeds = int(sys.argv[2]) if len(sys.argv) > 2 else 8
     budget = int(sys.argv[3]) if len(sys.argv) > 3 else 420
     jobs = [(k, s, budget) for k in keys for s in range(1, seeds + 1)]

@@ -23,6 +23,9 @@ dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.5"]
 [tool.setuptools.packages.find]
 include = ["app*"]
 
+[tool.setuptools.package-data]
+app = ["data/*.json", "data/real/*.npz"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 

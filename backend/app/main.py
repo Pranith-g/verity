@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from . import __version__
+from .api import benchmarks as benchmarks_api
 from .api import overview as overview_api
 from .api import races as races_api
 from .api import studies as studies_api
@@ -71,6 +72,7 @@ def create_app() -> FastAPI:
     app.include_router(studies_api.router)
     app.include_router(races_api.router)
     app.include_router(overview_api.router)
+    app.include_router(benchmarks_api.router)
 
     # Optional: serve the built frontend from the same container.
     if settings.static_dir and Path(settings.static_dir, "index.html").is_file():

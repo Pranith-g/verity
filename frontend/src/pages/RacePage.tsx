@@ -496,6 +496,11 @@ export function RacePage() {
           }
         >
           <p className="small muted inst-copy">{simInfo?.note ?? ''} The learners never see this map; they only get the value at the points they pay for.</p>
+          {simInfo?.kind === 'real' && (
+            <p className="small muted inst-copy sim-source">
+              Real data: {simInfo.inputs[0]} × {simInfo.inputs[1]} → {simInfo.output}. {simInfo.source}
+            </p>
+          )}
           <FieldMap z={T?.zArr ?? null} grid={T?.grid ?? 49} lo={T?.lo ?? 0} hi={T?.hi ?? 1} gamma={T?.gamma ?? 1} rings={truthRings} label="Map of the real simulator output" />
           <div className="cap">
             <span className="big">

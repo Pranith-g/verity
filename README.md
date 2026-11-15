@@ -83,6 +83,7 @@ getting the same point. You can also report points you chose yourself with `x1`,
 | `POST`/`DELETE /api/studies/{id}/autorun` | Demo studies: let a built-in simulator answer |
 | `DELETE /api/studies/{id}` | Delete a study and its runs |
 | `POST /api/races`, `GET /api/races/{id}/events` | Start a benchmark; follow it as server-sent events |
+| `GET /api/benchmarks/init-design` | Saved comparison of random vs maximin-LHS opening runs |
 | `GET /api/health` | Liveness check (always open) |
 
 ## Settings
@@ -100,9 +101,10 @@ Environment variables, or `backend/.env` (see `.env.example`).
 ## Checks
 
 ```bash
-cd backend  && ruff check . && pytest -q          # 24 tests
+cd backend  && ruff check . && pytest -q          # 33 tests
 cd frontend && npm run typecheck && npm test && npm run build
 python -m scripts.measure                         # from backend/: re-measure the table below
+python -m scripts.compare_init                    # from backend/: random vs LHS opening runs, for the web app
 ```
 
 ## Measured behaviour
@@ -123,9 +125,40 @@ true feature deeper than 5% of the range in the stand-in, with no invented ones.
 Verify's stop rule passed in 41 of the 56 runs and the referee agreed all 41 times. It never passed
 on Michalewicz, where no strategy finished.
 
+## Real data
+
+Real measured surfaces are listed separately from the test functions above: in the API
+(`"kind": "real"` on `GET /api/simulators`), in the web app's sidebar ("Real data"), and in code
+(`REAL_DATASETS` in `backend/app/core/real_data.py`, alongside `TEST_FUNCTIONS`). The default
+benchmark scripts still run the test functions only, so the table above is unchanged.
+
+| Dataset | Inputs → output | Grid | Source |
+|---|---|---|---|
+| Real terrain: Matterhorn | longitude, latitude → elevation (m) | 200 x 200, 2 arc-seconds (~43 x 62 m) | Copernicus DEM GLO-30, tile N45 E007 |
+
+Between grid cells the value is read by bilinear interpolation, so the learner can ask for any
+point in the box. Measured with `python -m scripts.measure terrain-matterhorn` (8 starts, 420 runs,
+10 features deeper than 5% of the 1555-4229 m range):
+
+| Strategy | Finished | Typical error |
+|---|---|---|
+| Verify | 0/8 | 1.71% |
+| Random | 0/8 | 2.27% |
+| Chase | 0/8 | 3.42% |
+
+No strategy finished within 420 runs, and Verify's stop rule correctly never declared done. Real
+terrain is rougher than any test function. To add another dataset, write a `.npz` into
+`backend/app/data/real/` (`scripts/fetch_dem.py` crops elevation tiles) and list it in
+`_CATALOGUE`.
+
+Copernicus DEM GLO-30: © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018,
+provided under COPERNICUS by the European Union and ESA; all rights reserved. It is a radar
+surface model, so it reads low on very steep spires (the Matterhorn summit comes out near
+4330 m, not 4478 m).
+
 ## Limits you should know about
 
-- **The stop rule is a heuristic, not a proof.** 41 out of 41 on seven toy simulators is evidence,
+- **The stop rule is a heuristic, not a proof.** 41 out of 41 on seven test functions is evidence,
   not a guarantee. A feature narrower than the 7% blind-spot limit can still be missed.
 - **Two inputs only.** Features are listed on a 49 x 49 grid, which does not extend past about
   three inputs.
@@ -147,10 +180,12 @@ on Michalewicz, where no strategy finished.
 
 ```
 backend/app/core/      numerical core: surrogate, features, learner, referee, race (no web, no DB)
+backend/app/core/real_data.py  real-data simulators, kept apart from the test functions
+backend/app/data/real/ the measured grids (.npz) those simulators read
 backend/app/services/  study logic, background races, demo auto-run
 backend/app/api/       HTTP routes
 backend/tests/         pytest suite
-backend/scripts/       measure.py: the table above
+backend/scripts/       measure.py: the tables above; fetch_dem.py: crop an elevation tile
 frontend/src/pages/    Benchmark, Studies, Study workbench
 frontend/src/components/  field map, charts, stop-rule list
 examples/client.py     ask/tell loop with the standard library

@@ -127,8 +127,21 @@ def test_demo_study_runs_by_itself_and_can_be_deleted(client):
     assert [s["id"] for s in client.get("/api/studies").json()] == [plain]
 
 
+def test_real_data_demo_study_uses_the_dataset_labels(client):
+    r = client.post("/api/studies", json={"name": "alps", "demo_simulator": "terrain-matterhorn"})
+    assert r.status_code == 201, r.text
+    body = r.json()
+    assert [i["name"] for i in body["inputs"]] == ["longitude", "latitude"]
+    assert body["output_name"] == "elevation_m"
+
+
 def test_race_streams_truth_steps_and_summary(client):
-    assert len(client.get("/api/simulators").json()) == 7
+    sims = client.get("/api/simulators").json()
+    assert [s["key"] for s in sims if s["kind"] == "test"][:1] == ["peaks"]
+    assert sum(s["kind"] == "test" for s in sims) == 7
+    real = [s for s in sims if s["kind"] == "real"]
+    assert [s["key"] for s in real] == ["terrain-matterhorn"]
+    assert real[0]["inputs"] == ["longitude", "latitude"] and "Copernicus" in real[0]["source"]
     assert client.post("/api/races", json={"simulator": "nope"}).status_code == 422
     assert client.post("/api/races", json={"simulator": "peaks", "budget": 100000}).status_code == 422
     race = client.post("/api/races", json={"simulator": "peaks", "budget": 90, "seed": 3}).json()
@@ -182,3 +195,12 @@ def test_a_running_race_can_be_stopped(client):
     assert client.get(f"/api/races/{rid}").json()["status"] == "stopped"
     assert client.delete(f"/api/races/{rid}").json()["stopped"] is False
     assert client.delete("/api/races/nope").status_code == 404
+
+
+def test_init_design_benchmark_is_served_when_saved(client):
+    r = client.get("/api/benchmarks/init-design")
+    assert r.status_code in (200, 404)
+    if r.status_code == 200:
+        body = r.json()
+        assert set(body["labels"]) == {"random", "lhs"}
+        assert body["overall"]["verdict"]["winner"] in ("random", "lhs", "tie")

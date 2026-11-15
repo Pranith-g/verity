@@ -2,11 +2,19 @@ export type Kind = 'random' | 'chase' | 'verify';
 export const KINDS: Kind[] = ['random', 'chase', 'verify'];
 export const KIND_NAME: Record<Kind, string> = { random: 'Random', chase: 'Chase', verify: 'Verify' };
 
+/** "test" = an analytic test function; "real" = a measured dataset, listed separately. */
+export type SimulatorKind = 'test' | 'real';
+
 export interface Simulator {
   key: string;
   name: string;
   note: string;
   box: [number, number, number, number];
+  kind: SimulatorKind;
+  inputs: [string, string];
+  output: string;
+  /** Where real data came from, with its attribution. Empty for test functions. */
+  source: string;
 }
 
 export interface Stop {
@@ -181,4 +189,96 @@ export interface Overview {
   autoruns_active: number;
   activity: number[];
   activity_bucket_min: number;
+}
+
+/* ---------- Opening-design benchmark (Euclidean vs Euclidean + LHS) ---------- */
+export type InitArm = 'random' | 'lhs';
+
+export interface InitCurvePoint {
+  n: number;
+  rmse: number;
+  captured: number; // share of true features captured, 0..1
+}
+
+export interface PairedTest {
+  lhs_wins: number;
+  random_wins: number;
+  ties: number;
+  p: number;
+}
+
+export interface InitArmSim {
+  finished: number;
+  median_done_at: number | null;
+  stop_fired: number;
+  stop_correct: number;
+  median_declared_at: number | null;
+  rmse_init: number;
+  rmse_early: number;
+  rmse_final: number;
+  init_min_dist: number;
+  init_gap: number;
+  curve: InitCurvePoint[];
+}
+
+export interface InitArmOverall {
+  finished: number;
+  stop_fired: number;
+  stop_correct: number;
+  init_min_dist: number;
+  init_gap: number;
+  median_finish: number;
+  curve: InitCurvePoint[];
+}
+
+export interface InitDesignExample {
+  points: [number, number][];
+  min_dist: number;
+  gap: number;
+  gap_at: [number, number];
+}
+
+export interface InitDesignReport {
+  generated_at: string;
+  seeds: number;
+  budget: number;
+  batch: number;
+  tau: number;
+  n_init: number;
+  early_at: number;
+  labels: Record<InitArm, string>;
+  seconds: number;
+  overall: {
+    finish: PairedTest;
+    early: PairedTest;
+    final: PairedTest;
+    spread: PairedTest;
+    timing?: InitTiming; // absent in reports saved before timing was measured
+    arms: Record<InitArm, InitArmOverall>;
+    verdict: { winner: InitArm | 'tie'; strong: boolean; headline: string; reasons: string[] };
+  };
+  simulators: {
+    key: string;
+    name: string;
+    features: number;
+    arms: Record<InitArm, InitArmSim>;
+    finish: PairedTest;
+    early: PairedTest;
+  }[];
+  examples?: Record<InitArm, InitDesignExample>;
+}
+
+export interface InitArmTiming {
+  design_ms: number; // building the 12 opening points
+  compute_s: number; // learner wall time for the whole budget, median start
+  finish_s: number | null; // learner wall time until every feature was found, median finished start
+  finish_runs: number | null; // runs bought until every feature was found, median finished start
+  total_compute_s: number;
+}
+
+export interface InitTiming {
+  workers: number;
+  arms: Record<InitArm, InitArmTiming>;
+  finish: PairedTest;
+  compute: PairedTest;
 }

@@ -255,11 +255,18 @@ function NewStudy({ sims, onCreated }: { sims: Simulator[]; onCreated: (s: Study
         <label htmlFor="st-demo">
           Example simulator
           <select id="st-demo" value={demo} onChange={(e) => setDemo(e.target.value)}>
-            {sims.map((s) => (
-              <option key={s.key} value={s.key}>
-                {s.name}
-              </option>
-            ))}
+            {(['test', 'real'] as const).map((kind) => {
+              const group = sims.filter((s) => (s.kind ?? 'test') === kind);
+              return group.length ? (
+                <optgroup key={kind} label={kind === 'real' ? 'Real data' : 'Test functions'}>
+                  {group.map((s) => (
+                    <option key={s.key} value={s.key}>
+                      {s.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null;
+            })}
           </select>
           {simNote && <span className="hint">{simNote}</span>}
         </label>

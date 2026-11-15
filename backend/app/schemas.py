@@ -172,6 +172,10 @@ class SimulatorOut(BaseModel):
     name: str
     note: str
     box: tuple[float, float, float, float]
+    kind: str = Field(description='"test" for an analytic test function, "real" for a measured dataset')
+    inputs: tuple[str, str]
+    output: str
+    source: str
 
 
 class RaceCreate(BaseModel):
