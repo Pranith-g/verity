@@ -1,0 +1,15 @@
+# docker compose up --build   ->   http://localhost:8000
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      VDC_API_KEY: ${VDC_API_KEY:-}
+      VDC_CORS_ORIGINS: '["http://localhost:8000"]'
+    volumes:
+      - vdc-data:/data
+    restart: unless-stopped
+
+volumes:
+  vdc-data:

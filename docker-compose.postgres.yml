@@ -1,0 +1,26 @@
+# Optional: store studies in Postgres instead of the SQLite file.
+#   docker compose -f docker-compose.yml -f docker-compose.postgres.yml up --build
+# NOTE: this path has not been exercised by the test suite yet. Run the tests against it first:
+#   VDC_DATABASE_URL=postgresql+psycopg://vdc:vdc@localhost:5432/vdc pytest
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: vdc
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vdc}
+      POSTGRES_DB: vdc
+    volumes:
+      - vdc-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vdc"]
+      interval: 5s
+      retries: 10
+  app:
+    environment:
+      VDC_DATABASE_URL: postgresql+psycopg://vdc:${POSTGRES_PASSWORD:-vdc}@db:5432/vdc
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  vdc-pg:
