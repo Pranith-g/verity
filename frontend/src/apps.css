@@ -961,8 +961,24 @@ input.range:focus-visible {
   border-color: rgba(0, 212, 255, 0.7);
   box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.15);
 }
+.csv-file {
+  position: relative;
+  align-self: flex-start;
+  cursor: pointer;
+}
+.csv-file input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.csv-file:focus-within {
+  outline: 2px solid rgba(0, 212, 255, 0.7);
+  outline-offset: 2px;
+}
 .csv-meta {
   display: flex;
+  flex-wrap: wrap;
   gap: 14px;
   align-items: center;
   color: var(--ink-2);

@@ -136,3 +136,21 @@ def test_model_card_explains_the_function_and_every_benchmark(client):
         dists = [b["distance"] for b in m["benchmarks"]]
         assert dists == sorted(dists)
     assert client.get("/api/apps/nope/model").status_code == 404
+
+
+DATASETS = __import__("pathlib").Path(__file__).resolve().parents[2] / "datasets"
+
+
+@pytest.mark.parametrize(
+    ("key", "name"), [("air-quality", "delhi-pm25-smog-nov2023.csv"), ("weather", "delhi-temperature-2023.csv")]
+)
+def test_shipped_real_datasets_are_accepted(client, key, name):
+    """The real-data CSVs in datasets/ fit the app's input box and one batch, and the API takes them."""
+    lines = (DATASETS / name).read_text(encoding="utf-8").splitlines()[1:]  # skip the header
+    readings = [{"x1": float(a), "x2": float(b), "value": float(c)} for a, b, c, *_ in (ln.split(",") for ln in lines)]
+    assert 0 < len(readings) <= 500
+    _trained(client, key)
+    r = client.post(f"/api/apps/{key}/readings", json={"readings": readings, "source": "csv"})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    print(key, "surprises", sum(i["surprise"] for i in out["items"]), "of", len(out["items"]))

@@ -1,0 +1,115 @@
+/* ---------- 3D scenes: opening designs and the studies board ---------- */
+
+/* Opening design: two tiles of pillars, drag to turn */
+.design3d {
+  position: relative;
+  height: clamp(260px, 34vw, 380px);
+  margin: 6px -4px 0;
+  border-radius: 12px;
+  background:
+    radial-gradient(70% 90% at 50% 75%, rgba(47, 243, 160, 0.07), transparent 70%),
+    radial-gradient(60% 80% at 30% 20%, rgba(139, 149, 255, 0.08), transparent 70%);
+  cursor: grab;
+  touch-action: pan-y;
+}
+.design3d:active {
+  cursor: grabbing;
+}
+.design3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.design-captions {
+  margin-top: 4px;
+  text-align: center;
+}
+.design-captions figcaption {
+  justify-items: center;
+}
+
+/* Studies: the board of towers sits to the right of the page heading */
+.city3d-card {
+  position: relative;
+  flex: 0 0 min(440px, 42%);
+  margin: 0;
+  align-self: stretch;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  min-height: 230px;
+  border: 1px solid var(--line-2);
+  border-radius: 16px;
+  background:
+    radial-gradient(90% 100% at 50% 70%, rgba(124, 92, 255, 0.14), transparent 70%),
+    radial-gradient(60% 60% at 80% 10%, rgba(0, 212, 255, 0.1), transparent 70%),
+    var(--panel);
+  overflow: hidden;
+}
+.city3d-wrap {
+  position: relative;
+  min-height: 250px;
+}
+.city3d {
+  position: absolute;
+  inset: 0;
+}
+.city3d canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+.city3d-tip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  display: grid;
+  gap: 2px;
+  max-width: 220px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-3);
+  border-radius: 8px;
+  background: var(--panel-solid);
+  font-size: 12.5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+}
+.city3d-tip.on {
+  opacity: 1;
+}
+.city3d-tip b {
+  overflow-wrap: anywhere;
+  font-weight: 500;
+}
+.city3d-tip .mono {
+  color: var(--ink-2);
+  font-size: 11.5px;
+}
+.city3d-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--line);
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.city3d-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+@media (max-width: 900px) {
+  .city3d-card {
+    flex-basis: auto;
+    width: 100%;
+    min-height: 240px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .city3d-tip {
+    transition: none;
+  }
+}

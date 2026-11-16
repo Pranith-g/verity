@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, ApiError } from '../api';
-import { ErrorNote, Panel, Tile } from '../components/bits';
+import { ErrorNote, Panel, Segmented, Tile } from '../components/bits';
+import { DesignCube3D } from '../components/DesignCube3D';
 import { CheckIcon, ClockIcon, GridIcon, RulerIcon, TargetIcon } from '../components/icons';
 import { Legend, LineChart } from '../components/LineChart';
 import { pct, when } from '../lib/format';
@@ -8,6 +9,7 @@ import type { InitArm, InitDesignExample, InitDesignReport, InitTiming, PairedTe
 
 const ARMS: InitArm[] = ['random', 'lhs'];
 const COLOR: Record<InitArm, string> = { random: 'var(--s-random)', lhs: 'var(--s-verify)' };
+const HEX: Record<InitArm, string> = { random: '#8b95ff', lhs: '#2ff3a0' }; // the same tokens, for WebGL
 const SHORT: Record<InitArm, string> = { random: 'Euclidean', lhs: '+ LHS' }; // end-of-line labels have ~70px
 const ZOOM = 150; // runs shown in the curves: the opening design only matters early
 
@@ -169,6 +171,7 @@ export function OpeningDesignPage() {
   const [error, setError] = useState<string | null>(null);
   // 'missing': the endpoint exists but nothing is saved; 'stale': the server predates the endpoint
   const [missing, setMissing] = useState<false | 'missing' | 'stale'>(false);
+  const [view, setView] = useState<'3d' | 'flat'>('3d');
 
   useEffect(() => {
     api
@@ -281,9 +284,48 @@ export function OpeningDesignPage() {
           </section>
 
           <div className="split">
-            <Panel title={<span className="mono-title">opening/designs</span>} className="rise">
-              <p className="small muted">The opening runs of the first benchmark start. The red circle is the biggest blind spot each design leaves.</p>
-              {r.examples ? (
+            <Panel
+              title={<span className="mono-title">opening/designs</span>}
+              className="rise"
+              aside={
+                r.examples && (
+                  <Segmented
+                    id="design-view"
+                    label="View"
+                    compact
+                    value={view}
+                    options={[
+                      { value: '3d', label: '3D' },
+                      { value: 'flat', label: 'Flat' },
+                    ]}
+                    onChange={setView}
+                  />
+                )
+              }
+            >
+              <p className="small muted">
+                The opening runs of the first benchmark start. The red {view === '3d' ? 'well' : 'circle'} is the biggest blind spot each design leaves.
+                {view === '3d' && ' Pillar height is the distance to the nearest other run: an even skyline means even spacing. The yellow line joins the closest pair. Drag to turn.'}
+              </p>
+              {r.examples && view === '3d' ? (
+                <>
+                  <DesignCube3D
+                    tiles={ARMS.map((a) => ({ key: a, ex: r.examples![a], color: HEX[a], grid: a === 'lhs' }))}
+                    label={`The opening runs in 3D. ${ARMS.map((a) => `${L[a]}: closest pair ${r.examples![a].min_dist.toFixed(2)} apart, biggest hole radius ${r.examples![a].gap.toFixed(2)}`).join('. ')}.`}
+                  />
+                  <div className="design-pair design-captions">
+                    {ARMS.map((a) => (
+                      <figure key={a} className="design-plot">
+                        <figcaption>
+                          <b style={{ color: COLOR[a] }}>{L[a]}</b>
+                          <span className="mono small">closest pair {r.examples![a].min_dist.toFixed(2)}</span>
+                          <span className="mono small">biggest hole {r.examples![a].gap.toFixed(2)}</span>
+                        </figcaption>
+                      </figure>
+                    ))}
+                  </div>
+                </>
+              ) : r.examples ? (
                 <div className="design-pair">
                   {ARMS.map((a) => (
                     <DesignPlot key={a} ex={r.examples![a]} arm={a} label={L[a]} />

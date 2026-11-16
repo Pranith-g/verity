@@ -686,6 +686,7 @@ function Predictor({
 
 /* ====================================================================== add data */
 type Tab = 'single' | 'csv' | 'feed';
+const MAX_BATCH = 500; // the API accepts up to 500 readings per request
 
 function AddData({
   state,
@@ -702,6 +703,7 @@ function AddData({
   const [tab, setTab] = useState<Tab>('single');
   const [kind, setKind] = useState<'sensor' | 'verified'>('sensor');
   const [csv, setCsv] = useState('');
+  const [csvName, setCsvName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [feed, setFeed] = useState(false);
@@ -742,11 +744,27 @@ function AddData({
     setError(null);
     try {
       onRetrained(await api.addReadings(state.key, readings, source));
-      if (source === 'csv') setCsv('');
+      if (source === 'csv') {
+        setCsv('');
+        setCsvName(null);
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  // a file from disk goes into the same box, so it can be checked (and edited) before it is added
+  const onCsvFile = async (file: File | undefined, input: HTMLInputElement) => {
+    input.value = ''; // picking the same file again still fires a change
+    if (!file) return;
+    setError(null);
+    try {
+      setCsv(await file.text());
+      setCsvName(file.name);
+    } catch {
+      setError(`Could not read ${file.name}.`);
     }
   };
 
@@ -863,13 +881,18 @@ function AddData({
             One reading per line: {in1.label.toLowerCase()}, {in2.label.toLowerCase()}, {state.output_label} and optionally <code>verified</code>
             <textarea className="csv-box mono" rows={6} value={csv} spellCheck={false} placeholder={csvPlaceholder} onChange={(e) => setCsv(e.target.value)} />
           </label>
+          <label className="btn csv-file">
+            <FileIcon size={14} /> {csvName ? `Loaded ${csvName}` : 'Choose a .csv file'}
+            <input type="file" accept=".csv,.tsv,.txt,text/csv" onChange={(e) => void onCsvFile(e.target.files?.[0], e.target)} />
+          </label>
           <div className="csv-meta small">
             <span>
               <FileIcon size={13} /> {parsed.rows.length} reading{parsed.rows.length === 1 ? '' : 's'} ready
             </span>
+            {parsed.rows.length > MAX_BATCH && <span className="danger-text">at most {MAX_BATCH} readings per batch; split the file</span>}
             {parsed.errors.length > 0 && <span className="danger-text">{parsed.errors.slice(0, 2).join(' · ')}</span>}
           </div>
-          <button className="btn primary" type="button" disabled={busy || !ready || parsed.rows.length === 0} onClick={() => void submit(parsed.rows, 'csv')}>
+          <button className="btn primary" type="button" disabled={busy || !ready || parsed.rows.length === 0 || parsed.rows.length > MAX_BATCH} onClick={() => void submit(parsed.rows, 'csv')}>
             <BoltIcon size={15} /> {busy ? 'Retraining…' : `Add ${parsed.rows.length || ''} & retrain`}
           </button>
         </div>

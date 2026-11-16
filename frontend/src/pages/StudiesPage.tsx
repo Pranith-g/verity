@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { ErrorNote, LiveDot, Num, Panel, Segmented, Sparkline, Tile } from '../components/bits';
 import { ActivityIcon, CheckIcon, ChevronIcon, FlaskIcon, LayersIcon, PlusIcon, TargetIcon } from '../components/icons';
+import { StudyCity3D } from '../components/StudyCity3D';
 import { ago, int } from '../lib/format';
 import type { Overview, Simulator, Study, StudyStatus } from '../types';
 
@@ -71,6 +72,20 @@ export function StudiesPage() {
             A study learns one simulator. You run the simulator; the service names the next runs to buy and tells you when the stand-in is good enough to stop.
           </p>
         </div>
+        {studies && studies.length > 0 && (
+          <figure className="city3d-card">
+            <StudyCity3D studies={studies} onPick={(id) => navigate(`/studies/${id}`)} />
+            <figcaption className="city3d-legend">
+              {(['collecting', 'learning', 'ready', 'out_of_budget'] as StudyStatus[]).map((s) => (
+                <span key={s}>
+                  <i className={`ring-dot ${STATUS_TONE[s]} filled`} aria-hidden="true" />
+                  {STATUS_TEXT[s]}
+                </span>
+              ))}
+              <span className="muted">height = budget used</span>
+            </figcaption>
+          </figure>
+        )}
       </header>
 
       <section className="tiles-row" aria-label="Studies at a glance">

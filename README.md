@@ -107,7 +107,7 @@ Environment variables, or `backend/.env` (see `.env.example`).
 ## Checks
 
 ```bash
-cd backend  && ruff check . && pytest -q          # 41 tests
+cd backend  && ruff check . && pytest -q          # 43 tests
 cd frontend && npm run typecheck && npm test && npm run build
 python -m scripts.measure                         # from backend/: re-measure the table below
 python -m scripts.compare_init                    # from backend/: random vs LHS opening runs, for the web app
@@ -183,7 +183,12 @@ blended into the surrogate at once: a *sensor* reading is treated as noisy, so t
 towards it; a *verified* reading is matched exactly. The reply shows the forecast before and after,
 whether the reading was a surprise (off by more than the learner's allowed miss, widened by sensor
 noise for sensor readings), the change in accuracy, and where the learner would measure next. The page
-also accepts pasted CSV and has a live simulated-sensor feed.
+also accepts CSV (pasted, or loaded from a file) and has a live simulated-sensor feed.
+
+**Real data to try.** [`datasets/`](datasets/README.md) holds real historical readings for New Delhi
+from Open-Meteo (CC BY 4.0): hourly PM2.5 through the November 2023 smog episode for the air-quality
+app, and a year of 2023 temperatures for the weather app. Load one and watch the surprises get flagged
+and the surface retrain.
 
 **Which function each application uses.** None of the benchmark functions. Rastrigin, Peaks and the
 rest are abstract test landscapes without units, there to test the learner. Each application has its
